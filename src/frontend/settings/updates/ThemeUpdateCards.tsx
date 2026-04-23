@@ -116,13 +116,14 @@ await fetchAvailableUpdates(true);
 setUpdatingAll(false);
 
 if (anyFailed) {
-Utils.ShowMessageBox(locale.updateFailed.replace('{0}', 'one or more themes'), SteamLocale('#Generic_Error'), { bAlertDialog: true });
+Utils.ShowMessageBox(formatString(locale.updateFailed, 'one or more themes'), SteamLocale('#Generic_Error'), { bAlertDialog: true });
 return;
 }
 
 if (needsRestart) {
-const reload = await Utils.ShowMessageBox(formatString(locale.updateSuccessfulRestart, activeTheme?.data?.name ?? 'active theme'), SteamLocale('#Settings_RestartRequired_Title'));
-reload && SteamClient.Browser.RestartJSContext();
+	const themeName = themeUpdates.find((u: UpdateItemType) => pluginSelf.activeTheme?.native === u?.native)?.name ?? activeTheme?.data?.name;
+	const reload = await Utils.ShowMessageBox(formatString(locale.updateSuccessfulRestart, themeName), SteamLocale('#Settings_RestartRequired_Title'));
+	reload && SteamClient.Browser.RestartJSContext();
 }
 }
 

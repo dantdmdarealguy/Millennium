@@ -115,7 +115,7 @@ if (needsRestart) {
 const totalCount = themeUpdates.length + pluginUpdates.length;
 toaster.toast({
 title: 'Updates Applied',
-body: `${totalCount} update${totalCount === 1 ? '' : 's'} applied. Restarting Steam...`,
+body: `${totalCount} update${totalCount === 1 ? '' : 's'} applied. Reloading Steam interface...`,
 logo: <IconsModule.Download />,
 });
 
