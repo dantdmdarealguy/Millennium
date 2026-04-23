@@ -36,6 +36,7 @@ export interface AppConfig {
 		injectCSS: boolean;
 		checkForMillenniumUpdates: boolean;
 		checkForPluginAndThemeUpdates: boolean;
+		autoUpdatePluginsAndThemesOnStartup: boolean;
 		onMillenniumUpdate: OnMillenniumUpdate;
 		millenniumUpdateChannel: MillenniumUpdateChannel;
 		shouldShowThemePluginUpdateNotifications: boolean;

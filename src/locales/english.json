@@ -156,5 +156,15 @@
   "pluginIsNotEnabled": "This plugin is disabled!",
   "themeConfigChangeReloadHeader": "Hold Up!",
   "themeConfigChangeReloadBody": "Your theme settings have been updated. Would you like to reload the Steam UI to apply the changes?",
-  "strConfirm": "Let's do it!"
+  "strConfirm": "Let's do it!",
+  "strUpdateAllPlugins": "Update All & Restart",
+  "strUpdateAllThemes": "Update All Themes",
+  "strUpdateAllPluginsConfirmTitle": "Update All Plugins",
+  "strUpdateAllPluginsConfirmBody": "This will update all available plugin updates. Any enabled plugins will be temporarily disabled, updated, and then re-enabled. Steam will restart once all updates are complete.",
+  "strUpdateAllThemesConfirmTitle": "Update All Themes",
+  "strUpdateAllThemesConfirmBody": "This will update all available theme updates. If your currently active theme is among them, Steam will need to restart.",
+  "strUpdateAllPluginsProgress": "Updating all plugins...",
+  "strUpdateAllComplete": "All updates applied! Restarting...",
+  "optionAutoUpdateOnStartup": "Auto-update plugins & themes on startup",
+  "optionAutoUpdateOnStartupTooltip": "Automatically apply all available plugin and theme updates when Steam starts. Any enabled plugins will be temporarily disabled and re-enabled after updating."
 }

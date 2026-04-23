@@ -28,7 +28,7 @@
  * SOFTWARE.
  */
 
-import { pluginSelf, sleep } from '@steambrew/client';
+import { DialogButton, IconsModule, joinClassNames, pluginSelf, sleep } from '@steambrew/client';
 import { SettingsDialogSubHeader } from '../../components/SteamComponents';
 import { formatString, locale, SteamLocale } from '../../utils/localization-manager';
 import { UpdateCard, UpdateItemType } from './UpdateCard';
@@ -38,81 +38,139 @@ import { ThemeItem } from '../../types';
 import { Utils } from '../../utils';
 import { produce } from 'immer';
 import { useState } from 'react';
+import { settingsClasses } from '../../utils/classes';
+import { MillenniumIcons } from '../../components/Icons';
 
 interface UpdateState {
-	statusText: string;
-	progress: number;
-	uxSleepLength: number;
+statusText: string;
+progress: number;
+uxSleepLength: number;
 }
 
 async function StartThemeUpdate(ctx: UpdateContextProviderState, setUpdateState: (newState: UpdateState) => Promise<unknown>, updateObject: UpdateItemType, index: number) {
-	const { setUpdatingThemes, isAnyUpdating, fetchAvailableUpdates } = ctx;
-	if (isAnyUpdating()) return;
+const { setUpdatingThemes, isAnyUpdating, fetchAvailableUpdates } = ctx;
+if (isAnyUpdating()) return;
 
-	setUpdatingThemes((prev) =>
-		produce(prev, (draft) => {
-			draft[index] = true;
-		}),
-	);
+setUpdatingThemes((prev) =>
+produce(prev, (draft) => {
+draft[index] = true;
+}),
+);
 
-	await setUpdateState({
-		statusText: locale.strUpdatingTheme,
-		progress: 100,
-		uxSleepLength: 1000,
-	});
+await setUpdateState({
+statusText: locale.strUpdatingTheme,
+progress: 100,
+uxSleepLength: 1000,
+});
 
-	const updateSuccess = await PyUpdateTheme({ native: updateObject.native });
+const updateSuccess = await PyUpdateTheme({ native: updateObject.native });
 
-	if (updateSuccess) {
-		await setUpdateState({
-			statusText: locale.strFinishedUpdating,
-			progress: 100,
-			uxSleepLength: 1000,
-		});
+if (updateSuccess) {
+await setUpdateState({
+statusText: locale.strFinishedUpdating,
+progress: 100,
+uxSleepLength: 1000,
+});
 
-		await fetchAvailableUpdates(true);
-		const activeTheme: ThemeItem = pluginSelf.activeTheme;
+await fetchAvailableUpdates(true);
+const activeTheme: ThemeItem = pluginSelf.activeTheme;
 
-		if (activeTheme?.native === updateObject?.native) {
-			const reload = await Utils.ShowMessageBox(formatString(locale.updateSuccessfulRestart, updateObject?.name), SteamLocale('#Settings_RestartRequired_Title'));
-			reload && SteamClient.Browser.RestartJSContext();
-		}
-	} else {
-		Utils.ShowMessageBox(formatString(locale.updateFailed, updateObject?.name), SteamLocale('#Generic_Error'));
-	}
+if (activeTheme?.native === updateObject?.native) {
+const reload = await Utils.ShowMessageBox(formatString(locale.updateSuccessfulRestart, updateObject?.name), SteamLocale('#Settings_RestartRequired_Title'));
+reload && SteamClient.Browser.RestartJSContext();
+}
+} else {
+Utils.ShowMessageBox(formatString(locale.updateFailed, updateObject?.name), SteamLocale('#Generic_Error'));
+}
 
-	setUpdatingThemes((prev) =>
-		produce(prev, (draft) => {
-			draft[index] = false;
-		}),
-	);
+setUpdatingThemes((prev) =>
+produce(prev, (draft) => {
+draft[index] = false;
+}),
+);
+}
+
+async function StartAllThemeUpdates(ctx: UpdateContextProviderState, themeUpdates: UpdateItemType[], setUpdatingAll: (v: boolean) => void) {
+const { isAnyUpdating, fetchAvailableUpdates } = ctx;
+if (isAnyUpdating()) return;
+
+const confirmed = await Utils.ShowMessageBox(locale.strUpdateAllThemesConfirmBody, locale.strUpdateAllThemesConfirmTitle);
+if (!confirmed) return;
+
+setUpdatingAll(true);
+
+const activeTheme: ThemeItem = pluginSelf.activeTheme;
+let needsRestart = false;
+let anyFailed = false;
+
+for (const update of themeUpdates) {
+const success = await PyUpdateTheme({ native: update.native });
+if (!success) {
+anyFailed = true;
+} else if (activeTheme?.native === update?.native) {
+needsRestart = true;
+}
+}
+
+await fetchAvailableUpdates(true);
+setUpdatingAll(false);
+
+if (anyFailed) {
+Utils.ShowMessageBox(locale.updateFailed.replace('{0}', 'one or more themes'), SteamLocale('#Generic_Error'), { bAlertDialog: true });
+return;
+}
+
+if (needsRestart) {
+const reload = await Utils.ShowMessageBox(formatString(locale.updateSuccessfulRestart, activeTheme?.data?.name ?? 'active theme'), SteamLocale('#Settings_RestartRequired_Title'));
+reload && SteamClient.Browser.RestartJSContext();
+}
 }
 
 export function ThemeUpdateCard({ themeUpdates }: { themeUpdates: UpdateItemType[] }) {
-	if (!themeUpdates || !themeUpdates.length) return null;
+if (!themeUpdates || !themeUpdates.length) return null;
 
-	const ctx = useUpdateContext();
-	const [updateState, setUpdateState] = useState<UpdateState>(null);
+const ctx = useUpdateContext();
+const [updateState, setUpdateState] = useState<UpdateState>(null);
+const [isUpdatingAll, setIsUpdatingAll] = useState(false);
 
-	const setNewState = async (newState: UpdateState): Promise<unknown> => {
-		setUpdateState(newState);
-		return await sleep(newState.uxSleepLength);
-	};
+const setNewState = async (newState: UpdateState): Promise<unknown> => {
+setUpdateState(newState);
+return await sleep(newState.uxSleepLength);
+};
 
-	return (
-		<>
-			<SettingsDialogSubHeader>Themes</SettingsDialogSubHeader>
-			{themeUpdates?.map((update: UpdateItemType, index: number) => (
-				<UpdateCard
-					update={update}
-					index={index}
-					totalCount={themeUpdates.length}
-					isUpdating={ctx.updatingThemes[index]}
-					progress={updateState?.progress}
-					statusText={updateState?.statusText}
-					onUpdateClick={StartThemeUpdate.spread(ctx, setNewState, update, index)}
-				/>
-			))}
-		</>
-	);
+return (
+<>
+<SettingsDialogSubHeader>Themes</SettingsDialogSubHeader>
+{themeUpdates.length > 1 && (
+<DialogButton
+className={joinClassNames(settingsClasses.SettingsDialogButton, 'MillenniumButton')}
+onClick={() => StartAllThemeUpdates(ctx, themeUpdates, setIsUpdatingAll)}
+disabled={isUpdatingAll || ctx.isAnyUpdating()}
+>
+{isUpdatingAll ? (
+<>
+<MillenniumIcons.LoadingSpinner />
+{locale.strUpdatingTheme}
+</>
+) : (
+<>
+<IconsModule.Download />
+{locale.strUpdateAllThemes}
+</>
+)}
+</DialogButton>
+)}
+{themeUpdates?.map((update: UpdateItemType, index: number) => (
+<UpdateCard
+update={update}
+index={index}
+totalCount={themeUpdates.length}
+isUpdating={ctx.updatingThemes[index]}
+progress={updateState?.progress}
+statusText={updateState?.statusText}
+onUpdateClick={StartThemeUpdate.spread(ctx, setNewState, update, index)}
+/>
+))}
+</>
+);
 }

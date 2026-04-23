@@ -44,6 +44,7 @@ import {PyGetRootColors, PyGetStartupConfig} from './utils/ffi';
 import {onWindowCreatedCallback, patchMissedDocuments} from './patcher';
 import {MillenniumSettings} from './settings';
 import {NotificationService} from './utils/update-notification-service';
+import {AutoUpdateService} from './utils/auto-update-service';
 import {MillenniumDesktopSidebar} from './quick-access';
 import {DesktopMenuProvider} from './quick-access/DesktopMenuContext';
 import {WelcomeModalComponent} from './components/WelcomeModal';
@@ -92,6 +93,9 @@ async function initializeMillennium(settings: SettingsProps) {
 
     const notificationService = new NotificationService();
     notificationService.showNotifications();
+
+    const autoUpdateService = new AutoUpdateService();
+    autoUpdateService.run();
 }
 
 // Entry point on the front end of your plugin

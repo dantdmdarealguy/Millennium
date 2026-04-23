@@ -50,6 +50,7 @@ nlohmann::json GetDefaultConfig()
             { "injectCSS", true },
             { "checkForMillenniumUpdates", true },
             { "checkForPluginAndThemeUpdates", true },
+            { "autoUpdatePluginsAndThemesOnStartup", false },
             { "onMillenniumUpdate", static_cast<int>(updateBehavior) },
             { "millenniumUpdateChannel", "stable" },
             { "shouldShowThemePluginUpdateNotifications", true },
