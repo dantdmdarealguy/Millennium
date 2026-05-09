@@ -28,7 +28,8 @@
  * SOFTWARE.
  */
 
-import { DialogButton, IconsModule, joinClassNames, useState } from '@steambrew/client';
+import { useState } from 'react';
+import { DialogButton, IconsModule, joinClassNames } from '@steambrew/client';
 import { SettingsDialogSubHeader } from '../../components/SteamComponents';
 import { formatString, locale, SteamLocale } from '../../utils/localization-manager';
 import { backend } from '../../utils/ffi';

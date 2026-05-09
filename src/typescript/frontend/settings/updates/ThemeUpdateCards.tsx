@@ -28,7 +28,8 @@
  * SOFTWARE.
  */
 
-import { DialogButton, IconsModule, joinClassNames, pluginSelf, useState } from '@steambrew/client';
+import { useState } from 'react';
+import { DialogButton, IconsModule, joinClassNames, pluginSelf } from '@steambrew/client';
 import { SettingsDialogSubHeader } from '../../components/SteamComponents';
 import { formatString, locale, SteamLocale } from '../../utils/localization-manager';
 import { UpdateCard, UpdateItemType } from './UpdateCard';
@@ -105,7 +106,7 @@ return;
 }
 
 if (needsRestart) {
-const themeName = themeUpdates.find((u) => u?.native === activeTheme?.native)?.name ?? activeTheme?.data?.name;
+const themeName = themeUpdates.find((u) => u?.native === activeTheme?.native)?.name ?? activeTheme?.data?.name ?? '';
 const reload = await Utils.ShowMessageBox(formatString(locale.updateSuccessfulRestart, themeName), SteamLocale('#Settings_RestartRequired_Title'));
 reload && SteamClient.Browser.RestartJSContext();
 }

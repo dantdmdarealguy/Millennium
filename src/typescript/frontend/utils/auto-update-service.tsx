@@ -32,7 +32,8 @@ import { IconsModule, pluginSelf, sleep, toaster } from '@steambrew/client';
 import { backend } from './ffi';
 import { settingsManager } from './settings-manager';
 import { Logger } from './Logger';
-import { ThemeItem, UpdateItemType } from '../types';
+import { ThemeItem } from '../types';
+import { UpdateItemType } from '../settings/updates/UpdateCard';
 import { waitForInstallerComplete } from '../settings/general/Installer';
 
 /**
