@@ -52,6 +52,7 @@ json head::get_default_config()
             { "injectCSS", true },
             { "checkForMillenniumUpdates", true },
             { "checkForPluginAndThemeUpdates", true },
+            { "autoUpdatePluginsAndThemesOnStartup", false },
             { "onMillenniumUpdate", static_cast<int>(updateBehavior) },
             { "millenniumUpdateChannel", "stable" },
             { "shouldShowThemePluginUpdateNotifications", true },

@@ -1,0 +1,148 @@
+/**
+ * ==================================================
+ *   _____ _ _ _             _
+ *  |     |_| | |___ ___ ___|_|_ _ _____
+ *  | | | | | | | -_|   |   | | | |     |
+ *  |_|_|_|_|_|_|___|_|_|_|_|_|___|_|_|_|
+ *
+ * ==================================================
+ *
+ * Copyright (c) 2026 Project Millennium
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+import { IconsModule, pluginSelf, sleep, toaster } from '@steambrew/client';
+import { backend } from './ffi';
+import { settingsManager } from './settings-manager';
+import { Logger } from './Logger';
+import { ThemeItem } from '../types';
+import { UpdateItemType } from '../settings/updates/UpdateCard';
+import { waitForInstallerComplete } from '../settings/general/Installer';
+
+/**
+ * Runs silently on startup when the user has opted in to auto-update plugins and themes.
+ * - Non-active themes are updated silently.
+ * - Active theme is updated and a restart toast is shown if needed.
+ * - Enabled plugins are stopped, updated, then re-enabled, followed by a JS context restart.
+ */
+export class AutoUpdateService {
+async run(): Promise<void> {
+await sleep(5000); // Let the rest of the startup sequence complete first
+
+if (!settingsManager.config?.general?.autoUpdatePluginsAndThemesOnStartup) {
+Logger.Log('Auto-update on startup is disabled, skipping.');
+return;
+}
+
+const themeUpdates: UpdateItemType[] = pluginSelf?.updates?.themes ?? [];
+const pluginUpdatesRaw: any[] = pluginSelf?.updates?.plugins ?? [];
+const pluginUpdates = pluginUpdatesRaw.filter((u: any) => u?.hasUpdate);
+
+const hasThemeUpdates = themeUpdates.length > 0;
+const hasPluginUpdates = pluginUpdates.length > 0;
+
+if (!hasThemeUpdates && !hasPluginUpdates) {
+Logger.Log('Auto-update: no plugin or theme updates available.');
+return;
+}
+
+Logger.Log(`Auto-update: applying ${themeUpdates.length} theme(s) and ${pluginUpdates.length} plugin(s).`);
+
+let needsRestart = false;
+
+// --- Update themes ---
+if (hasThemeUpdates) {
+const activeTheme: ThemeItem = pluginSelf.activeTheme;
+
+for (const update of themeUpdates) {
+try {
+const result = await backend.themes.update(update.native);
+const opId: number = result?.opId ?? 0;
+const success = await waitForInstallerComplete(opId, () => {});
+if (success && activeTheme?.native === update?.native) {
+needsRestart = true;
+}
+} catch (e) {
+Logger.Warn(`Auto-update: failed to update theme "${update?.name}":`, e);
+}
+}
+}
+
+// --- Update plugins ---
+if (hasPluginUpdates) {
+const enabledPluginNames: string[] = [];
+
+for (const update of pluginUpdates) {
+const pluginName = update?.pluginInfo?.pluginJson?.name;
+if (!pluginName) continue;
+const allPlugins = await backend.plugins.getPlugins();
+const plugin = allPlugins.find((p) => p.data.name === pluginName);
+if (plugin?.enabled) {
+enabledPluginNames.push(pluginName);
+try {
+await backend.plugins.stop(pluginName);
+} catch (e) {
+Logger.Warn(`Auto-update: failed to stop plugin "${pluginName}":`, e);
+}
+}
+}
+
+for (const update of pluginUpdates) {
+const commit = update?.pluginInfo?.commit;
+if (!commit) continue;
+try {
+const result = await backend.plugins.update(update?.id, update?.pluginDirectory, commit);
+const opId: number = result?.opId ?? 0;
+await waitForInstallerComplete(opId, () => {});
+} catch (e) {
+Logger.Warn(`Auto-update: failed to update plugin "${update?.pluginInfo?.pluginJson?.common_name}":`, e);
+}
+}
+
+for (const pluginName of enabledPluginNames) {
+try {
+await backend.plugins.togglePlugin(JSON.stringify([{ plugin_name: pluginName, enabled: true }]));
+} catch (e) {
+Logger.Warn(`Auto-update: failed to re-enable plugin "${pluginName}":`, e);
+}
+}
+
+needsRestart = true;
+}
+
+if (needsRestart) {
+const totalCount = themeUpdates.length + pluginUpdates.length;
+toaster.toast({
+title: 'Updates Applied',
+body: `${totalCount} update${totalCount === 1 ? '' : 's'} applied. Reloading Steam interface...`,
+logo: <IconsModule.Download />,
+});
+
+await sleep(3000);
+SteamClient.Browser.RestartJSContext();
+} else if (hasThemeUpdates) {
+toaster.toast({
+title: 'Themes Updated',
+body: `${themeUpdates.length} theme${themeUpdates.length === 1 ? '' : 's'} updated successfully.`,
+logo: <IconsModule.Download />,
+});
+}
+}
+}

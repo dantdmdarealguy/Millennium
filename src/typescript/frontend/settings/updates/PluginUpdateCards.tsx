@@ -28,6 +28,8 @@
  * SOFTWARE.
  */
 
+import { useState } from 'react';
+import { DialogButton, IconsModule, joinClassNames } from '@steambrew/client';
 import { SettingsDialogSubHeader } from '../../components/SteamComponents';
 import { formatString, locale, SteamLocale } from '../../utils/localization-manager';
 import { backend } from '../../utils/ffi';
@@ -36,84 +38,155 @@ import { UpdateCard } from './UpdateCard';
 import { UpdateContextProviderState, useUpdateContext } from './useUpdateContext';
 import { waitForInstallerComplete } from '../general/Installer';
 import { PluginUpdateInfo } from '../../types';
+import { settingsClasses } from '../../utils/classes';
+import { MillenniumIcons } from '../../components/Icons';
 
 const FindPluginByName = async (pluginName: string) => {
-	const allPlugins = await backend.plugins.getPlugins();
-	return allPlugins.find((plugin) => plugin.data.name === pluginName);
+const allPlugins = await backend.plugins.getPlugins();
+return allPlugins.find((plugin) => plugin.data.name === pluginName);
 };
 
 const StartPluginUpdate = async (ctx: UpdateContextProviderState, updateObject: PluginUpdateInfo) => {
-	const pluginName = updateObject?.pluginInfo?.pluginJson?.name;
-	const commit = updateObject?.pluginInfo?.commit;
-	if (!pluginName || !commit) return;
+const pluginName = updateObject?.pluginInfo?.pluginJson?.name;
+const commit = updateObject?.pluginInfo?.commit;
+if (!pluginName || !commit) return;
 
-	const key: string = updateObject?.id ?? updateObject?.pluginDirectory;
-	const { setUpdatingPlugin, setPluginProgress, fetchAvailableUpdates } = ctx;
-	if (ctx.updatingPlugins[key]) return;
+const key: string = updateObject?.id ?? updateObject?.pluginDirectory;
+const { setUpdatingPlugin, setPluginProgress, fetchAvailableUpdates } = ctx;
+if (ctx.updatingPlugins[key]) return;
 
-	setUpdatingPlugin(key, true);
-	setPluginProgress(key, { statusText: locale.strPreparing, progress: 0 });
+setUpdatingPlugin(key, true);
+setPluginProgress(key, { statusText: locale.strPreparing, progress: 0 });
 
-	const wasEnabled = (await FindPluginByName(pluginName))?.enabled;
+const wasEnabled = (await FindPluginByName(pluginName))?.enabled;
 
-	if (wasEnabled) {
-		await backend.plugins.stop(pluginName);
-	}
+if (wasEnabled) {
+await backend.plugins.stop(pluginName);
+}
 
-	const result = await backend.plugins.update(updateObject.id, updateObject.pluginDirectory, commit);
-	const opId: number = result?.opId ?? 0;
+const result = await backend.plugins.update(updateObject.id, updateObject.pluginDirectory, commit);
+const opId: number = result?.opId ?? 0;
 
-	const updateSuccess = await waitForInstallerComplete(opId, ({ progress, status }) => {
-		setPluginProgress(key, { statusText: status, progress });
-	});
+const updateSuccess = await waitForInstallerComplete(opId, ({ progress, status }) => {
+setPluginProgress(key, { statusText: status, progress });
+});
 
-	if (wasEnabled) {
-		if (!updateSuccess) {
-			await Utils.ShowMessageBox(formatString(locale.updateFailed, updateObject?.name), SteamLocale('#Generic_Error'), { bAlertDialog: true });
-		}
-		setPluginProgress(key, { statusText: locale.strComplete, progress: 100 });
-		sessionStorage.setItem('millennium-settings-tab', '/millennium/settings/updates');
-		await backend.plugins.togglePlugin(JSON.stringify([{ plugin_name: pluginName, enabled: true }]));
-		return;
-	}
+if (wasEnabled) {
+if (!updateSuccess) {
+await Utils.ShowMessageBox(formatString(locale.updateFailed, updateObject?.name), SteamLocale('#Generic_Error'), { bAlertDialog: true });
+}
+setPluginProgress(key, { statusText: locale.strComplete, progress: 100 });
+sessionStorage.setItem('millennium-settings-tab', '/millennium/settings/updates');
+await backend.plugins.togglePlugin(JSON.stringify([{ plugin_name: pluginName, enabled: true }]));
+return;
+}
 
-	if (updateSuccess) {
-		setPluginProgress(key, { statusText: locale.strComplete, progress: 100 });
-		await fetchAvailableUpdates(true);
-	} else {
-		Utils.ShowMessageBox(formatString(locale.updateFailed, updateObject?.name), SteamLocale('#Generic_Error'), {
-			bAlertDialog: true,
-		});
-	}
+if (updateSuccess) {
+setPluginProgress(key, { statusText: locale.strComplete, progress: 100 });
+await fetchAvailableUpdates(true);
+} else {
+Utils.ShowMessageBox(formatString(locale.updateFailed, updateObject?.name), SteamLocale('#Generic_Error'), {
+bAlertDialog: true,
+});
+}
 
-	setUpdatingPlugin(key, false);
-	setPluginProgress(key, null);
+setUpdatingPlugin(key, false);
+setPluginProgress(key, null);
+};
+
+const StartAllPluginUpdates = async (ctx: UpdateContextProviderState, pluginUpdates: PluginUpdateInfo[], setUpdatingAll: (v: boolean) => void) => {
+const { isAnyUpdating, fetchAvailableUpdates } = ctx;
+if (isAnyUpdating()) return;
+
+const confirmed = await Utils.ShowMessageBox(locale.strUpdateAllPluginsConfirmBody, locale.strUpdateAllPluginsConfirmTitle);
+if (!confirmed) return;
+
+setUpdatingAll(true);
+
+// Find which plugins with available updates are currently enabled
+const enabledPluginNames: string[] = [];
+for (const update of pluginUpdates) {
+const pluginName = update?.pluginInfo?.pluginJson?.name;
+if (!pluginName) continue;
+const plugin = await FindPluginByName(pluginName);
+if (plugin?.enabled) {
+enabledPluginNames.push(pluginName);
+await backend.plugins.stop(pluginName);
+}
+}
+
+// Update all plugins sequentially
+let anyFailed = false;
+for (const update of pluginUpdates) {
+const commit = update?.pluginInfo?.commit;
+if (!commit) continue;
+const result = await backend.plugins.update(update.id, update.pluginDirectory, commit);
+const opId: number = result?.opId ?? 0;
+const success = await waitForInstallerComplete(opId, () => {});
+if (!success) anyFailed = true;
+}
+
+// Re-enable the plugins that were previously enabled
+for (const pluginName of enabledPluginNames) {
+await backend.plugins.togglePlugin(JSON.stringify([{ plugin_name: pluginName, enabled: true }]));
+}
+
+await fetchAvailableUpdates(true);
+setUpdatingAll(false);
+
+if (anyFailed) {
+Utils.ShowMessageBox(formatString(locale.updateFailed, 'one or more plugins'), SteamLocale('#Generic_Error'), { bAlertDialog: true });
+return;
+}
+
+// Restart JS context so the updated plugins are loaded
+SteamClient.Browser.RestartJSContext();
 };
 
 export function PluginUpdateCard({ pluginUpdates }: { pluginUpdates: PluginUpdateInfo[] }) {
-	if (!pluginUpdates || !pluginUpdates.length) return null;
+if (!pluginUpdates || !pluginUpdates.length) return null;
 
-	const ctx = useUpdateContext();
+const ctx = useUpdateContext();
+const [isUpdatingAll, setIsUpdatingAll] = useState(false);
 
-	return (
-		<>
-			<SettingsDialogSubHeader>{locale.settingsPanelPlugins}</SettingsDialogSubHeader>
-			{pluginUpdates?.map((update, index) => (
-				<UpdateCard
-					update={{
-						name: update?.pluginInfo?.pluginJson?.common_name,
-						message: update?.commitMessage,
-						date: Utils.toTimeAgo(update?.pluginInfo?.commitDate),
-						commit: update?.pluginInfo?.commit,
-					}}
-					index={index}
-					totalCount={pluginUpdates.length}
-					isUpdating={ctx.updatingPlugins[update?.id ?? update?.pluginDirectory]}
-					progress={ctx.pluginProgress[update?.id ?? update?.pluginDirectory]?.progress ?? 0}
-					statusText={ctx.pluginProgress[update?.id ?? update?.pluginDirectory]?.statusText ?? ''}
-					onUpdateClick={() => StartPluginUpdate(ctx, update)}
-				/>
-			))}
-		</>
-	);
+return (
+<>
+<SettingsDialogSubHeader>{locale.settingsPanelPlugins}</SettingsDialogSubHeader>
+{pluginUpdates.length > 1 && (
+<DialogButton
+className={joinClassNames(settingsClasses.SettingsDialogButton, 'MillenniumButton')}
+onClick={() => StartAllPluginUpdates(ctx, pluginUpdates, setIsUpdatingAll)}
+disabled={isUpdatingAll || ctx.isAnyUpdating()}
+>
+{isUpdatingAll ? (
+<>
+<MillenniumIcons.LoadingSpinner />
+{locale.strUpdateAllPluginsProgress}
+</>
+) : (
+<>
+<IconsModule.Download />
+{locale.strUpdateAllPlugins}
+</>
+)}
+</DialogButton>
+)}
+{pluginUpdates?.map((update, index) => (
+<UpdateCard
+update={{
+name: update?.pluginInfo?.pluginJson?.common_name,
+message: update?.commitMessage,
+date: Utils.toTimeAgo(update?.pluginInfo?.commitDate),
+commit: update?.pluginInfo?.commit,
+}}
+index={index}
+totalCount={pluginUpdates.length}
+isUpdating={ctx.updatingPlugins[update?.id ?? update?.pluginDirectory]}
+progress={ctx.pluginProgress[update?.id ?? update?.pluginDirectory]?.progress ?? 0}
+statusText={ctx.pluginProgress[update?.id ?? update?.pluginDirectory]?.statusText ?? ''}
+onUpdateClick={() => StartPluginUpdate(ctx, update)}
+/>
+))}
+</>
+);
 }

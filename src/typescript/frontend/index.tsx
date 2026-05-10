@@ -43,6 +43,7 @@ import { backend } from './utils/ffi';
 import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
+import { AutoUpdateService } from './utils/auto-update-service';
 import { OnRunSteamURL } from './utils/url-scheme-handler';
 import { showPluginCrashModal } from './components/PluginCrashModal';
 import { showLegacyPluginModal } from './components/LegacyPluginModal';
@@ -95,6 +96,9 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	const notificationService = new NotificationService();
 	notificationService.showNotifications();
+
+	const autoUpdateService = new AutoUpdateService();
+	autoUpdateService.run();
 
 	const crashQueue: PluginCrashInfo[] = [];
 	let mainWindowReady = false;

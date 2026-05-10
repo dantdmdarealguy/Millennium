@@ -74,8 +74,16 @@ export const GeneralViewModal: React.FC = () => {
 					<Toggle value={config.general.checkForMillenniumUpdates} onChange={(e) => handleChange('checkForMillenniumUpdates', e)} />
 				</Field>
 
-				<Field label={locale.optionCheckForThemeAndPluginUpdates} bottomSeparator="none">
+				<Field label={locale.optionCheckForThemeAndPluginUpdates}>
 					<Toggle value={config.general.checkForPluginAndThemeUpdates} onChange={(e) => handleChange('checkForPluginAndThemeUpdates', e)} />
+				</Field>
+
+				<Field label={locale.optionAutoUpdateOnStartup} description={locale.optionAutoUpdateOnStartupTooltip} bottomSeparator="none">
+					<Toggle
+						value={config.general.autoUpdatePluginsAndThemesOnStartup}
+						onChange={(e) => handleChange('autoUpdatePluginsAndThemesOnStartup', e)}
+						disabled={!config.general.checkForPluginAndThemeUpdates}
+					/>
 				</Field>
 			</DialogControlsSection>
 
